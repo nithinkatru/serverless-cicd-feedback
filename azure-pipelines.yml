@@ -4,7 +4,7 @@ trigger:
       - main
 
 pool:
-  name: MySelfHostedPool
+  name: LocalSelfHostedPool
 
 steps:
   - task: NodeTool@0
