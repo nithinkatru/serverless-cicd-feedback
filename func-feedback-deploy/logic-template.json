@@ -1,0 +1,91 @@
+﻿{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "logicAppName": { "type": "string" },
+    "office365ConnectionName": { "type": "string" },
+    "office365ConnectionId": { "type": "string" }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Logic/workflows",
+      "apiVersion": "2019-05-01",
+      "name": "[parameters('logicAppName')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "definition": {
+          "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+          "contentVersion": "1.0.0.0",
+          "triggers": {
+            "OnPipelineCompleted": {
+              "type": "Request",
+              "kind": "Http",
+              "inputs": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "resource": {
+                      "type": "object",
+                      "properties": {
+                        "result": { "type": "string" },
+                        "url":    { "type": "string" },
+                        "pipeline": {
+                          "type": "object",
+                          "properties": {
+                            "name": { "type": "string" }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "actions": {
+            "IfSucceeded": {
+              "type": "If",
+              "expression": {
+                "equals": [
+                  "@triggerBody()?['resource']?['result']",
+                  "succeeded"
+                ]
+              },
+              "actions": {
+                "SendSuccessEmail": {
+                  "type": "ApiConnection",
+                  "inputs": {
+                    "host": { "connection": { "name": "[parameters('office365ConnectionId')]" } },
+                    "operationId": "SendEmail",
+                    "parameters": {
+                      "To": "devteam@contoso.com",
+                      "Subject": "✅ Build succeeded: @{triggerBody()?['resource']?['pipeline']?['name']}",
+                      "Body": "Your pipeline succeeded! Details: @{triggerBody()?['resource']?['url']}"
+                    }
+                  }
+                }
+              },
+              "else": {
+                "actions": {
+                  "SendFailureEmail": {
+                    "type": "ApiConnection",
+                    "inputs": {
+                      "host": { "connection": { "name": "[parameters('office365ConnectionId')]" } },
+                      "operationId": "SendEmail",
+                      "parameters": {
+                        "To": "devteam@contoso.com",
+                        "Subject": "❌ Build FAILED: @{triggerBody()?['resource']?['pipeline']?['name']}",
+                        "Body": "Your pipeline failed. Details: @{triggerBody()?['resource']?['url']}"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": {}
+      }
+    }
+  ]
+}
